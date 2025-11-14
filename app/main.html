@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Webhook Console</title>
+    <style>
+        :root {
+            --bg: #eef2f6;
+            --card: #ffffff;
+            --accent: #2563eb;
+            --accent-dark: #1e3a8a;
+            --border: #d9e2ec;
+            --text: #1f2933;
+            --muted: #6b7280;
+            font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at top, #ebf4ff, var(--bg));
+            padding: clamp(1.5rem, 4vw, 3rem);
+            color: var(--text);
+        }
+
+        main {
+            width: min(900px, 100%);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 22px;
+            padding: clamp(1.5rem, 3vw, 2rem);
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+            border: 1px solid rgba(37, 99, 235, 0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.4rem, 3vw, 1.9rem);
+            font-weight: 700;
+        }
+
+        p.lede {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            background: #f8fafc;
+            padding: 0.9rem 1.1rem;
+            font: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            border-color: var(--accent);
+            outline: none;
+            background: #fff;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 170px;
+            line-height: 1.5;
+        }
+
+        button {
+            border: none;
+            border-radius: 18px;
+            padding: 0.9rem 1.4rem;
+            font: inherit;
+            font-weight: 600;
+            color: #fff;
+            background: var(--accent);
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        button:hover {
+            background: var(--accent-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 15px 25px rgba(37, 99, 235, 0.25);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .result-box {
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            background: #f9fafb;
+            padding: 1.1rem;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .result-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .fetch-tools {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .fetch-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+        }
+
+        .fetch-row input {
+            flex: 1 1 200px;
+        }
+
+        .flash {
+            border-radius: 16px;
+            padding: 0.85rem 1rem;
+            font-size: 0.95rem;
+            background: rgba(37, 99, 235, 0.08);
+            color: var(--text);
+            border: 1px solid rgba(37, 99, 235, 0.25);
+        }
+
+        .flash.error {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #b91c1c;
+        }
+
+        .result-text {
+            margin: 0;
+            font-size: 1rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.8rem;
+        }
+
+        .image-grid img {
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid #e5e7eb;
+            object-fit: cover;
+            background: #fff;
+        }
+
+        .helper-text {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-top: -0.4rem;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <section class="card">
+        <div>
+            <h1>AI Webhook Playground</h1>
+            <p class="lede">Kết nối trực tiếp tới backend FastAPI (http://localhost:8000) để tạo panel truyện AI.</p>
+        </div>
+        <form id="aiForm">
+            <div>
+                <label for="webhookUrl">Webhook URL</label>
+                <input type="text" id="webhookUrl" name="webhookUrl" placeholder="http://localhost:8000/generate">
+                <p class="helper-text">Nhập endpoint POST của FastAPI (mặc định http://localhost:8000/generate).</p>
+            </div>
+            <div>
+                <label for="userText">Nội dung gửi cho AI</label>
+                <textarea id="userText" name="userText" placeholder="Enter your story text…"></textarea>
+            </div>
+            <button type="submit" id="generateBtn">
+                <span>⚡</span> Generate with AI
+            </button>
+        </form>
+    </section>
+    <section class="card">
+        <h2 style="margin: 0;">Kết quả phản hồi</h2>
+        <div class="result-box" id="resultBox">
+            <div class="flash" id="statusMessage">Chờ yêu cầu đầu tiên…</div>
+            <div class="fetch-tools">
+                <label for="imageEndpoint">Endpoint GET lấy hình</label>
+                <div class="fetch-row">
+                    <input type="text" id="imageEndpoint" placeholder="http://localhost:8000/images">
+                    <button type="button" id="fetchImagesBtn">📷 Lấy hình qua GET</button>
+                </div>
+                <p class="helper-text">Endpoint FastAPI trả danh sách ảnh gần đây (GET http://localhost:8000/images).</p>
+            </div>
+            <div id="resultContent" class="result-content"></div>
+        </div>
+    </section>
+</main>
+<script>
+    // Base webhook URL (can be overwritten via the input field above).
+    const DEFAULT_WEBHOOK_URL = "http://localhost:8000/generate";
+    const DEFAULT_IMAGE_WEBHOOK = "http://localhost:8000/images";
+    const STORAGE_KEY = "ai_webhook_url";
+    const STORAGE_KEY_IMAGE = "ai_image_webhook_url";
+
+    const refs = {
+        form: document.getElementById("aiForm"),
+        webhook: document.getElementById("webhookUrl"),
+        userText: document.getElementById("userText"),
+        button: document.getElementById("generateBtn"),
+        resultBox: document.getElementById("resultBox"),
+        statusMessage: document.getElementById("statusMessage"),
+        resultContent: document.getElementById("resultContent"),
+        imageEndpoint: document.getElementById("imageEndpoint"),
+        fetchImagesBtn: document.getElementById("fetchImagesBtn"),
+    };
+    const defaultButtonLabel = refs.button.innerHTML;
+    const defaultImageButtonLabel = refs.fetchImagesBtn.innerHTML;
+
+    const storedWebhook = localStorage.getItem(STORAGE_KEY);
+    refs.webhook.value = storedWebhook || DEFAULT_WEBHOOK_URL;
+
+    const storedImageEndpoint = localStorage.getItem(STORAGE_KEY_IMAGE);
+    refs.imageEndpoint.value = storedImageEndpoint || DEFAULT_IMAGE_WEBHOOK;
+
+    refs.webhook.addEventListener("change", () => {
+        localStorage.setItem(STORAGE_KEY, refs.webhook.value.trim());
+    });
+
+    refs.imageEndpoint.addEventListener("change", () => {
+        localStorage.setItem(STORAGE_KEY_IMAGE, refs.imageEndpoint.value.trim());
+    });
+
+    function setLoading(isLoading) {
+        refs.button.disabled = isLoading;
+        refs.button.innerHTML = isLoading ? "Generating..." : defaultButtonLabel;
+    }
+
+    function setImageLoading(isLoading) {
+        refs.fetchImagesBtn.disabled = isLoading;
+        refs.fetchImagesBtn.innerHTML = isLoading ? "Loading..." : defaultImageButtonLabel;
+    }
+
+    function showStatus(type, message) {
+        refs.statusMessage.className = type === "error" ? "flash error" : "flash";
+        refs.statusMessage.textContent = message;
+        refs.statusMessage.hidden = false;
+    }
+
+    function renderImages(urls) {
+        const grid = document.createElement("div");
+        grid.className = "image-grid";
+        urls.forEach((url) => {
+            const img = document.createElement("img");
+            img.src = url;
+            img.alt = "AI generated";
+            grid.appendChild(img);
+        });
+        return grid;
+    }
+
+    function renderResult(payload) {
+        refs.resultContent.innerHTML = "";
+        const text = document.createElement("p");
+        text.className = "result-text";
+        text.textContent = payload.result || payload.message || JSON.stringify(payload, null, 2);
+        refs.resultContent.appendChild(text);
+
+        const images = collectImageUrls(payload);
+        if (images.length) {
+            refs.resultContent.appendChild(renderImages(images));
+        }
+        showStatus("info", "Webhook response received.");
+    }
+
+    function collectImageUrls(payload) {
+        const urls = new Set();
+        const possibles = [
+            payload.image_url,
+            ...(Array.isArray(payload.image_urls) ? payload.image_urls : []),
+            ...(Array.isArray(payload.images) ? payload.images : []),
+        ];
+        possibles.forEach((entry) => {
+            if (!entry) return;
+            if (typeof entry === "string") {
+                urls.add(entry);
+                return;
+            }
+            if (typeof entry === "object" && entry.url) {
+                urls.add(entry.url);
+            }
+        });
+        return Array.from(urls);
+    }
+
+    async function fetchImagesFromWebhook() {
+        const endpoint = refs.imageEndpoint.value.trim() || DEFAULT_IMAGE_WEBHOOK;
+        localStorage.setItem(STORAGE_KEY_IMAGE, endpoint);
+        setImageLoading(true);
+        showStatus("info", "Loading images from GET endpoint...");
+
+        try {
+            // Hit the FastAPI endpoint with GET to retrieve most recent image URLs.
+            const response = await fetch(endpoint, { method: "GET" });
+            if (!response.ok) {
+                throw new Error(`GET webhook returned ${response.status}`);
+            }
+
+            const data = await response.json();
+            const images = collectImageUrls(data);
+
+            if (!images.length) {
+                showStatus("error", "GET endpoint did not return any images.");
+                refs.resultContent.innerHTML = "";
+                return;
+            }
+
+            refs.resultContent.innerHTML = "";
+            refs.resultContent.appendChild(renderImages(images));
+            showStatus("info", "Images loaded successfully from GET webhook.");
+        } catch (error) {
+            console.error("GET endpoint error", error);
+            showStatus("error", "Unable to load images from GET endpoint.");
+        } finally {
+            setImageLoading(false);
+        }
+    }
+
+    refs.fetchImagesBtn.addEventListener("click", fetchImagesFromWebhook);
+
+    refs.form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const userText = refs.userText.value.trim();
+        const webhookUrl = refs.webhook.value.trim() || DEFAULT_WEBHOOK_URL;
+
+        if (!userText) {
+            showStatus("error", "Please enter text before sending.");
+            return;
+        }
+
+        // Persist latest URL so the user doesn't have to retype it.
+        localStorage.setItem(STORAGE_KEY, webhookUrl);
+
+        setLoading(true);
+        showStatus("info", "Generating response...");
+
+        try {
+            // Send user text to FastAPI POST endpoint in JSON payload.
+            const response = await fetch(webhookUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ text: userText }),
+            });
+
+            // If webhook returns error status, throw to activate catch branch.
+            if (!response.ok) {
+                throw new Error(`Webhook returned ${response.status}`);
+            }
+
+            // Parse JSON reply; assume format like { result: "...", image_url?: "" }.
+            const data = await response.json();
+            renderResult(data);
+        } catch (error) {
+            console.error("Webhook error", error);
+            showStatus("error", "Something went wrong! Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    });
+</script>
+</body>
+</html>
