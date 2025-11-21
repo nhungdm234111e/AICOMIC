@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comic AI Creator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Comic+Neue:wght@400;700&family=Bangers&family=Permanent+Marker&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; margin:0; padding:0; }
+        @media print {
+            header, .control-panel, .no-print { display: none !important; }
+            .canvas-area { width: 100% !important; }
+            .comic-panel { page-break-inside: avoid; margin: 20px 0; }
+        }
+        .comic-header {
+            background: linear-gradient(90deg,#f97316,#ef4444,#ec4899,#8b5cf6);
+            border-bottom: 4px solid #111827;
+            box-shadow: 0 6px 0 #111827;
+        }
+        .comic-title {
+            font-family: 'Bangers', system-ui;
+            letter-spacing: 0.08em;
+            text-shadow: 0 3px 0 #00000055;
+        }
+        .comic-logo-box {
+            border-radius: 0.5rem;
+            border: 3px solid #111827;
+            box-shadow: 0 4px 0 #111827;
+        }
+        .comic-card {
+            position: relative;
+            border-radius: 1rem;
+            border: 4px solid #111827;
+            box-shadow: 0 6px 0 #111827;
+            background: radial-gradient(circle at top left,#fef3c7 0,#ffffff 55%,#e0f2fe 100%);
+            overflow: hidden;
+        }
+        .comic-card::before {
+            content: "";
+            position: absolute;
+            inset: -40px;
+            background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0);
+            background-size: 6px 6px;
+            opacity: 0.35;
+            pointer-events: none;
+            mix-blend-mode: multiply;
+        }
+        .comic-card > * { position: relative; z-index: 1; }
+        .comic-section-title {
+            font-family: 'Bangers', system-ui;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #1f2937;
+        }
+        .comic-panel {
+            border: 6px solid #000 !important;
+            border-radius: 8px;
+            box-shadow: 0 4px 0 #000;
+            background: #fefce8;
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: 1 / 1;
+        }
+        .comic-panel img { width: 100%; height: 100%; object-fit: cover; }
+        .speech-bubble {
+            position: absolute;
+            z-index: 10;
+            min-width: 80px;
+            min-height: 60px;
+            resize: both;
+            overflow: visible;
+            border: 2px dashed transparent;
+            cursor: move;
+            background: transparent;
+            user-select: none;
+        }
+        .speech-bubble:hover, .speech-bubble.selected { border-color: #9333ea !important; }
+        .speech-bubble .bubble-svg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .speech-bubble .bubble-text {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px; bottom: 20px;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            text-align: center;
+            font-size: 18px;
+            color: #000;
+            font-family: 'Comic Neue', cursive;
+            z-index: 2;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.4;
+            overflow: hidden;
+            word-wrap: break-word;
+            padding: 0;
+            margin: 0;
+        }
+        .speech-bubble .delete-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 3;
+            pointer-events: auto;
+        }
+        .speech-bubble:hover .delete-btn,
+        .speech-bubble.selected .delete-btn { display: flex; }
+        .resize-handle {
+            position: absolute;
+            bottom: -10px;
+            right: -10px;
+            width: 20px;
+            height: 20px;
+            background: #9333ea;
+            border-radius: 50%;
+            cursor: se-resize;
+            z-index: 4;
+            display: none;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .speech-bubble:hover .resize-handle,
+        .speech-bubble.selected .resize-handle { display: block !important; }
+        .generated-image {
+            width: 100px; height: 100px;
+            object-fit: cover;
+            border: 3px solid #9333ea;
+            border-radius: 8px;
+            cursor: move;
+            margin: 4px;
+            box-shadow: 0 2px 0 #000;
+            transition: transform 0.2s;
+        }
+        .generated-image:hover { transform: scale(1.05); }
+        .panel-container { transition: transform 0.3s ease; }
+        .status-message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-weight: 500;
+            text-align: center;
+        }
+        .status-info { background: #dbeafe; color: #1e40af; border: 2px solid #3b82f6; }
+        .status-error { background: #fee2e2; color: #991b1b; border: 2px solid #ef4444; }
+        .status-success { background: #d1fae5; color: #065f46; border: 2px solid #10b981; }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 min-h-screen">
+    <header class="comic-header sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 comic-logo-box bg-yellow-300 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="comic-title text-3xl text-white">COMIC AI CREATOR</h1>
+                    <p class="text-xs text-yellow-100 font-medium -mt-1 tracking-wide">Drag • Drop • Talk • BOOM!!</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="printComic()" class="px-4 py-2 bg-black/80 hover:bg-black text-yellow-300 rounded-lg flex items-center gap-2 transition shadow-[0_4px_0_#000] border-2 border-yellow-300">In</button>
+                <button onclick="saveComic()" class="px-4 py-2 bg-yellow-300 hover:bg-yellow-400 text-black rounded-lg flex items-center gap-2 transition shadow-[0_4px_0_#000] border-2 border-black">Lưu</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div class="lg:col-span-2 control-panel">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-4">
+                        <div class="comic-card p-5">
+                            <h3 class="comic-section-title text-lg mb-4">Cài đặt truyện</h3>
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold mb-2 text-gray-800">API Endpoint</label>
+                                <input type="text" id="apiEndpoint" value="http://localhost:8000/generate" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none transition bg-white/80">
+                                <p class="mt-1 text-xs text-gray-600">URL của API backend để tạo ảnh</p>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold mb-2 text-gray-800">Bố cục khung truyện</label>
+                                <select id="layoutSelect" onchange="changeLayout()" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none transition bg-white/80">
+                                    <option value="grid-1">1 ô lớn</option>
+                                    <option value="grid-2">2 ô dọc</option>
+                                    <option value="grid-1x2">2 ô ngang</option>
+                                    <option value="grid-2x2" selected>2x2 (4 ô)</option>
+                                    <option value="grid-3">3 ô dọc</option>
+                                    <option value="grid-strip-4">4 ô ngang (strip)</option>
+                                    <option value="grid-4">2x3 (6 ô)</option>
+                                    <option value="grid-2x4">2x4 (8 ô)</option>
+                                    <option value="grid-3x3">3x3 (9 ô)</option>
+                                    <option value="grid-4x3">4x3 (12 ô)</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-semibold mb-2 text-gray-800">Câu chuyện (mỗi dòng = 1 cảnh):</label>
+                                <textarea id="storyInput" placeholder="Nhập từng cảnh truyện lên từng dòng, ví dụ:&#10;Cảnh 1: Nhân vật chính thức dậy trong thành phố tương lai...&#10;Cảnh 2: Một con robot bí ẩn xuất hiện..." class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none transition resize-none bg-white/80" rows="6"></textarea>
+                            </div>
+                            <button onclick="generateImages()" id="generateBtn" class="w-full py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-yellow-400 hover:from-purple-700 hover:via-pink-700 hover:to-yellow-500 text-white font-bold rounded-lg transition shadow-[0_4px_0_#000] border-2 border-black">TẠO ẢNH AI 🎨</button>
+                        </div>
+
+                        <div class="comic-card p-5">
+                            <h3 class="comic-section-title text-lg mb-4">Ảnh đã tạo</h3>
+                            <div id="statusContainer"></div>
+                            <div id="generatedImages" class="flex flex-wrap justify-center min-h-[60px]">
+                                <p class="text-gray-700 text-sm">Chưa có ảnh — hãy nhập story rồi bấm "TẠO ẢNH AI".</p>
+                            </div>
+                            <button onclick="loadGallery()" id="galleryBtn" class="w-full mt-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-[0_3px_0_#000] border-2 border-black">Tải danh sách ảnh đã tạo</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="comic-card p-5">
+                            <h3 class="comic-section-title text-lg mb-4">Khung thoại (kéo + resize)</h3>
+                            <div class="max-h-72 overflow-y-auto pr-2">
+                                <div class="grid grid-cols-3 gap-2 text-xs">
+                                    <div draggable="true" ondragstart="dragBubble(event,'speech-round')" class="cursor-move p-2 bg-white border-2 border-gray-300 rounded-lg hover:shadow-lg transition">
+                                        <svg viewBox="0 0 100 80" class="w-full h-12"><ellipse cx="50" cy="35" rx="45" ry="30" fill="white" stroke="black" stroke-width="2"/><circle cx="40" cy="60" r="4" fill="white" stroke="black" stroke-width="2"/><circle cx="32" cy="68" r="2" fill="white" stroke="black" stroke-width="2"/></svg>
+                                        <div class="text-xs font-semibold text-center mt-1">Tròn</div>
+                                    </div>
+                                    <div draggable="true" ondragstart="dragBubble(event,'speech-oval')" class="cursor-move p-2 bg-white border-2 border-gray-300 rounded-lg hover:shadow-lg transition">
+                                        <svg viewBox="0 0 100 80" class="w-full h-12"><ellipse cx="50" cy="35" rx="48" ry="32" fill="white" stroke="black" stroke-width="2"/><path d="M 30 60 L 20 75 L 35 65 Z" fill="white" stroke="black" stroke-width="2"/></svg>
+                                        <div class="text-xs font-semibold text-center mt-1">Oval</div>
+                                    </div>
+                                    <div draggable="true" ondragstart="dragBubble(event,'shout-spiky')" class="cursor-move p-2 bg-yellow-50 border-2 border-yellow-400 rounded-lg hover:shadow-lg transition">
+                                        <svg viewBox="0 0 100 80" class="w-full h-12"><path d="M 50 10 L 55 20 L 65 15 L 65 25 L 75 25 L 70 35 L 80 40 L 70 45 L 75 55 L 65 50 L 65 60 L 55 55 L 50 65 L 45 55 L 35 60 L 35 50 L 25 55 L 30 45 L 20 40 L 30 35 L 25 25 L 35 25 L 35 15 L 45 20 Z" fill="#FEF08A" stroke="black" stroke-width="2"/></svg>
+                                        <div class="text-xs font-semibold text-center mt-1">Hét</div>
+                                    </div>
+                                    <div draggable="true" ondragstart="dragBubble(event,'thought-cloud')" class="cursor-move p-2 bg-white border-2 border-gray-300 rounded-lg hover:shadow-lg transition">
+                                        <svg viewBox="0 0 100 80" class="w-full h-12"><circle cx="35" cy="30" r="18" fill="white" stroke="black" stroke-width="2"/><circle cx="55" cy="25" r="15" fill="white" stroke="black" stroke-width="2"/><circle cx="68" cy="35" r="12" fill="white" stroke="black" stroke-width="2"/><circle cx="30" cy="60" r="6" fill="white" stroke="black" stroke-width="2"/><circle cx="20" cy="70" r="3" fill="white" stroke="black" stroke-width="2"/></svg>
+                                        <div class="text-xs font-semibold text-center mt-1">Mây</div>
+                                    </div>
+                                    <div draggable="true" ondragstart="dragBubble(event,'caption-box')" class="cursor-move p-2 bg-yellow-50 border-2 border-yellow-500 rounded-lg hover:shadow-lg transition">
+                                        <svg viewBox="0 0 100 80" class="w-full h-12"><rect x="10" y="20" width="80" height="40" fill="#FEFCE8" stroke="black" stroke-width="2"/></svg>
+                                        <div class="text-xs font-semibold text-center mt-1">Chú thích</div>
+                                    </div>
+                                    <div draggable="true" ondragstart="dragBubble(event,'narration-box')" class="cursor-move p-2 bg-blue-50 border-2 border-blue-400 rounded-lg hover:shadow-lg transition">
+                                        <svg viewBox="0 0 100 80" class="w-full h-12"><rect x="10" y="20" width="80" height="40" rx="3" fill="#DBEAFE" stroke="black" stroke-width="2"/></svg>
+                                        <div class="text-xs font-semibold text-center mt-1">Tường thuật</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="comic-card p-5">
+                            <h3 class="comic-section-title text-lg mb-4">Định dạng & trang trí</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Cỡ chữ</label>
+                                    <input type="range" id="fontSize" min="12" max="48" value="18" class="w-full" oninput="updateSelectedTextFormat()">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Màu chữ</label>
+                                    <input type="color" id="textColor" value="#000000" class="w-full h-10 rounded" oninput="updateSelectedTextFormat()">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Font chữ</label>
+                                    <select id="fontFamily" onchange="updateSelectedTextFormat()" class="w-full px-3 py-2 border rounded bg-white/80">
+                                        <option value="Comic Neue">Comic</option>
+                                        <option value="Bangers">Bangers</option>
+                                        <option value="Permanent Marker">Marker</option>
+                                        <option value="Caveat">Caveat</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="comic-card p-5">
+                            <h3 class="comic-section-title text-lg mb-4">Zoom khung truyện</h3>
+                            <input type="range" id="zoomSlider" min="50" max="150" value="100" class="w-full" oninput="updateZoom()">
+                            <div class="text-center mt-2 text-sm font-semibold" id="zoomValue">100%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 canvas-area">
+                <div class="comic-card p-8">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h2 class="comic-section-title text-xl">Khung truyện xem trước</h2>
+                        <span class="text-xs text-gray-700">Kéo ảnh & khung thoại vào các ô bên dưới.</span>
+                    </div>
+                    <div id="comicCanvas" class="grid grid-cols-2 gap-6 panel-container" style="transform:scale(1);transform-origin:top left;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedBubble = null;
+        let isDragging = false;
+        let isResizing = false;
+        let dragOffset = {x:0,y:0};
+        let resizeStart = {w:0,h:0,x:0,y:0};
+        let generatedImagesList = [];
+
+        window.onload = () => { changeLayout(); };
+
+        function showStatus(type, message) {
+            const c = document.getElementById('statusContainer');
+            c.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+        }
+
+        function clearStatus() {
+            document.getElementById('statusContainer').innerHTML = '';
+        }
+
+        function changeLayout() {
+            const layout = document.getElementById('layoutSelect').value;
+            const canvas = document.getElementById('comicCanvas');
+            const layouts = {
+                'grid-1': {cols:'grid-cols-1', count:1},
+                'grid-2': {cols:'grid-cols-1', count:2},
+                'grid-1x2': {cols:'grid-cols-2', count:2},
+                'grid-2x2': {cols:'grid-cols-2', count:4},
+                'grid-3': {cols:'grid-cols-1', count:3},
+                'grid-strip-4': {cols:'grid-cols-4', count:4},
+                'grid-4': {cols:'grid-cols-3', count:6},
+                'grid-2x4': {cols:'grid-cols-4', count:8},
+                'grid-3x3': {cols:'grid-cols-3', count:9},
+                'grid-4x3': {cols:'grid-cols-4', count:12}
+            };
+            const cfg = layouts[layout] || layouts['grid-2x2'];
+            canvas.className = `grid ${cfg.cols} gap-6 panel-container`;
+            canvas.innerHTML = '';
+            for(let i=1; i<=cfg.count; i++) {
+                canvas.appendChild(createPanel(i));
+            }
+            updateZoom();
+        }
+
+        function createPanel(id) {
+            const p = document.createElement('div');
+            p.className = 'comic-panel bg-gray-100 flex items-center justify-center relative';
+            p.id = 'panel-'+id;
+            p.innerHTML = `<div class="text-center text-gray-400 font-semibold text-sm">Ô ${id}</div>`;
+            p.addEventListener('dragover', e => e.preventDefault());
+            p.addEventListener('drop', e => handleDrop(e, id));
+            return p;
+        }
+
+        function renderGeneratedImages() {
+            const container = document.getElementById('generatedImages');
+            container.innerHTML = '';
+            
+            console.log('Rendering images, count:', generatedImagesList.length);
+            console.log('Image URLs:', generatedImagesList);
+            
+            if (generatedImagesList.length === 0) {
+                container.innerHTML = '<p class="text-gray-700 text-sm">Chưa có ảnh — hãy nhập story rồi bấm "TẠO ẢNH AI".</p>';
+                return;
+            }
+
+            generatedImagesList.forEach((url, index) => {
+                console.log(`Creating img element ${index + 1} with URL:`, url);
+                
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = 'generated-image';
+                img.draggable = true;
+                img.alt = `Generated image ${index + 1}`;
+                img.ondragstart = e => {
+                    e.dataTransfer.setData('imageUrl', url);
+                };
+                img.onerror = (e) => {
+                    console.error('Failed to load image:', url, e);
+                    img.style.border = '3px solid red';
+                    img.alt = 'Error loading image';
+                };
+                img.onload = () => {
+                    console.log('Image loaded successfully:', index + 1, url.substring(0, 50));
+                };
+                container.appendChild(img);
+            });
+            
+            console.log('Finished rendering, container children:', container.children.length);
+        }
+
+        async function generateImages() {
+            const story = document.getElementById('storyInput').value.trim();
+            const apiEndpoint = document.getElementById('apiEndpoint').value.trim();
+            
+            if (!story) {
+                showStatus('error', 'Bạn hãy nhập nội dung câu chuyện trước nhé!');
+                return;
+            }
+            
+            if (!apiEndpoint) {
+                showStatus('error', 'Vui lòng nhập API endpoint!');
+                return;
+            }
+
+            const scenes = story.split('\n').map(s => s.trim()).filter(s => s.length >= 10);
+            
+            if (scenes.length === 0) {
+                showStatus('error', 'Mỗi cảnh phải có ít nhất 10 ký tự!');
+                return;
+            }
+
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>Đang tạo ảnh...';
+            
+            // GIỮ NGUYÊN ảnh cũ - không xóa
+            showStatus('info', `Đang tạo ${scenes.length} ảnh từ câu chuyện của bạn...`);
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < scenes.length; i++) {
+                const scene = scenes[i];
+                showStatus('info', `Đang tạo ảnh ${i + 1}/${scenes.length}... (${scene.substring(0, 30)}...)`);
+                
+                try {
+                    console.log(`Sending request for scene ${i + 1}:`, scene);
+                    
+                    const response = await fetch(apiEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ text: scene })
+                    });
+
+                    console.log(`Response status for scene ${i + 1}:`, response.status);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error(`API error for scene ${i + 1}:`, errorText);
+                        throw new Error(`API returned ${response.status}: ${errorText}`);
+                    }
+
+                    const data = await response.json();
+                    console.log(`Response data for scene ${i + 1}:`, data);
+
+                    // Xử lý nhiều định dạng response khác nhau
+                    let imageUrl = null;
+                    
+                    if (data.status === 'success' && data.image_url) {
+                        imageUrl = data.image_url;
+                    } else if (data.image_url) {
+                        imageUrl = data.image_url;
+                    } else if (data.url) {
+                        imageUrl = data.url;
+                    } else if (data.image) {
+                        imageUrl = data.image;
+                    }
+
+                    console.log(`Extracted image URL for scene ${i + 1}:`, imageUrl);
+
+                    if (imageUrl) {
+                        // THÊM ảnh mới vào danh sách và hiển THỊ ngay lập tức
+                        generatedImagesList.push(imageUrl);
+                        renderGeneratedImages();
+                        successCount++;
+                        console.log(`Successfully added image ${successCount}, total images: ${generatedImagesList.length}`);
+                    } else {
+                        console.error(`No valid image URL found in response for scene ${i + 1}:`, data);
+                        errorCount++;
+                    }
+                } catch (error) {
+                    console.error(`Error generating image ${i + 1}:`, error);
+                    errorCount++;
+                }
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'TẠO ẢNH AI 🎨';
+
+            if (successCount > 0) {
+                showStatus('success', `Đã tạo thành công ${successCount}/${scenes.length} ảnh mới!${errorCount > 0 ? ' (' + errorCount + ' lỗi)' : ''}`);
+            } else {
+                showStatus('error', 'Không tạo được ảnh nào. Kiểm tra lại API endpoint và console log.');
+            }
+        }
+
+        async function loadGallery() {
+            const apiEndpoint = document.getElementById('apiEndpoint').value.trim();
+            if (!apiEndpoint) {
+                showStatus('error', 'Vui lòng nhập API endpoint!');
+                return;
+            }
+
+            const imageEndpoint = apiEndpoint.replace('/generate', '/images');
+            const btn = document.getElementById('galleryBtn');
+
+            btn.disabled = true;
+            btn.textContent = 'Đang tải...';
+            showStatus('info', 'Đang tải danh sách ảnh đã tạo...');
+
+            try {
+                const response = await fetch(imageEndpoint, { method: 'GET' });
+                if (!response.ok) throw new Error(`GET endpoint returned ${response.status}`);
+                
+                const data = await response.json();
+                const items = Array.isArray(data) ? data : [];
+
+                generatedImagesList = items.map(item => item.image_url || item.url).filter(Boolean);
+                renderGeneratedImages();
+                
+                if (generatedImagesList.length === 0) {
+                    showStatus('info', 'Chưa có ảnh nào trong thư mục generated.');
+                } else {
+                    showStatus('success', `Đã tải ${generatedImagesList.length} ảnh từ thư mục.`);
+                }
+            } catch (error) {
+                console.error('Gallery error:', error);
+                showStatus('error', 'Không lấy được danh sách ảnh: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Tải danh sách ảnh đã tạo';
+            }
+        }
+
+        function handleDrop(e, panelId) {
+            e.preventDefault();
+            const imgUrl = e.dataTransfer.getData('imageUrl');
+            const bubbleType = e.dataTransfer.getData('bubbleType');
+            
+            if (imgUrl) {
+                const panel = document.getElementById('panel-' + panelId);
+                panel.innerHTML = `<img src="${imgUrl}" class="w-full h-full object-cover">`;
+            }
+            if (bubbleType) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left - 75;
+                const y = e.clientY - rect.top - 60;
+                createBubble(panelId, bubbleType, x, y);
+            }
+        }
+
+        function dragBubble(e, t) { e.dataTransfer.setData('bubbleType', t); }
+
+        function createBubble(panelId, type, x, y) {
+            const panel = document.getElementById('panel-' + panelId);
+            const b = document.createElement('div');
+            const id = 'bubble-' + Date.now();
+            b.id = id;
+            b.className = 'speech-bubble';
+            b.style.left = x + 'px';
+            b.style.top = y + 'px';
+            b.style.width = '150px';
+            b.style.height = '120px';
+
+            const svgWrapper = document.createElement('div');
+            svgWrapper.className = 'bubble-svg';
+            svgWrapper.innerHTML = getSVG(type);
+
+            const ta = document.createElement('textarea');
+            ta.className = 'bubble-text';
+            ta.placeholder = 'Nhập thoại...';
+            ta.addEventListener('mousedown', e => { e.stopPropagation(); selectedBubble = b; });
+
+            const handle = document.createElement('div');
+            handle.className = 'resize-handle';
+            handle.addEventListener('mousedown', e => {
+                e.stopPropagation();
+                e.preventDefault();
+                selectedBubble = b;
+                isResizing = true;
+                const rect = b.getBoundingClientRect();
+                resizeStart = { w: rect.width, h: rect.height, x: e.clientX, y: e.clientY };
+                document.addEventListener('mousemove', doResize);
+                document.addEventListener('mouseup', stopResize);
+            });
+
+            const del = document.createElement('div');
+            del.className = 'delete-btn';
+            del.textContent = '×';
+            del.onclick = e => { e.stopPropagation(); b.remove(); };
+
+            b.appendChild(svgWrapper);
+            b.appendChild(ta);
+            b.appendChild(handle);
+            b.appendChild(del);
+
+            b.addEventListener('mousedown', e => {
+                if (e.target.classList.contains('bubble-text') || e.target.classList.contains('resize-handle') || e.target.classList.contains('delete-btn')) return;
+                selectedBubble = b;
+                isDragging = true;
+                const rect = b.getBoundingClientRect();
+                dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                document.addEventListener('mousemove', moveDrag);
+                document.addEventListener('mouseup', stopDrag);
+            });
+
+            function moveDrag(e) {
+                if (!isDragging) return;
+                const pr = panel.getBoundingClientRect();
+                b.style.left = (e.clientX - pr.left - dragOffset.x) + 'px';
+                b.style.top = (e.clientY - pr.top - dragOffset.y) + 'px';
+            }
+            function stopDrag() {
+                isDragging = false;
+                document.removeEventListener('mousemove', moveDrag);
+                document.removeEventListener('mouseup', stopDrag);
+            }
+            function doResize(e) {
+                if (!isResizing) return;
+                b.style.width = Math.max(80, resizeStart.w + e.clientX - resizeStart.x) + 'px';
+                b.style.height = Math.max(60, resizeStart.h + e.clientY - resizeStart.y) + 'px';
+            }
+            function stopResize() {
+                isResizing = false;
+                document.removeEventListener('mousemove', doResize);
+                document.removeEventListener('mouseup', stopResize);
+            }
+
+            panel.appendChild(b);
+        }
+
+        function updateSelectedTextFormat() {
+            if (!selectedBubble) return;
+            const ta = selectedBubble.querySelector('.bubble-text');
+            ta.style.fontSize = document.getElementById('fontSize').value + 'px';
+            ta.style.color = document.getElementById('textColor').value;
+            ta.style.fontFamily = document.getElementById('fontFamily').value;
+        }
+
+        function updateZoom() {
+            const z = document.getElementById('zoomSlider').value;
+            document.getElementById('zoomValue').textContent = z + '%';
+            document.querySelector('.panel-container').style.transform = `scale(${z/100})`;
+        }
+
+        function printComic() { window.print(); }
+        function saveComic() { alert('Bạn có thể dùng chức năng In (Ctrl+P) hoặc chụp màn hình để lưu truyện.'); }
+
+        function getSVG(t) {
+            const s = {
+                'speech-round': '<svg viewBox="0 0 100 80" class="w-full h-full"><ellipse cx="50" cy="35" rx="45" ry="30" fill="white" stroke="black" stroke-width="2"/><circle cx="40" cy="60" r="4" fill="white" stroke="black" stroke-width="2"/><circle cx="32" cy="68" r="2" fill="white" stroke="black" stroke-width="2"/></svg>',
+                'speech-oval': '<svg viewBox="0 0 100 80" class="w-full h-full"><ellipse cx="50" cy="35" rx="48" ry="32" fill="white" stroke="black" stroke-width="2"/><path d="M 30 60 L 20 75 L 35 65 Z" fill="white" stroke="black" stroke-width="2"/></svg>',
+                'shout-spiky': '<svg viewBox="0 0 100 80" class="w-full h-full"><path d="M 50 10 L 55 20 L 65 15 L 65 25 L 75 25 L 70 35 L 80 40 L 70 45 L 75 55 L 65 50 L 65 60 L 55 55 L 50 65 L 45 55 L 35 60 L 35 50 L 25 55 L 30 45 L 20 40 L 30 35 L 25 25 L 35 25 L 35 15 L 45 20 Z" fill="#FEF08A" stroke="black" stroke-width="2"/></svg>',
+                'thought-cloud': '<svg viewBox="0 0 100 80" class="w-full h-full"><circle cx="35" cy="30" r="18" fill="white" stroke="black" stroke-width="2"/><circle cx="55" cy="25" r="15" fill="white" stroke="black" stroke-width="2"/><circle cx="68" cy="35" r="12" fill="white" stroke="black" stroke-width="2"/><circle cx="30" cy="60" r="6" fill="white" stroke="black" stroke-width="2"/><circle cx="20" cy="70" r="3" fill="white" stroke="black" stroke-width="2"/></svg>',
+                'caption-box': '<svg viewBox="0 0 100 80" class="w-full h-full"><rect x="10" y="20" width="80" height="40" fill="#FEFCE8" stroke="black" stroke-width="2"/></svg>',
+                'narration-box': '<svg viewBox="0 0 100 80" class="w-full h-full"><rect x="10" y="20" width="80" height="40" rx="3" fill="#DBEAFE" stroke="black" stroke-width="2"/></svg>'
+            };
+            return s[t] || s['speech-round'];
+        }
+    </script>
+</body>
+</html>

@@ -38,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 class GenerateRequest(BaseModel):
     text: str = Field(..., description="Scene description for the comic panel")
 
